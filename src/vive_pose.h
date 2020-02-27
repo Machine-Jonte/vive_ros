@@ -7,34 +7,45 @@
 #include <openvr.h>
 // #include <unistd.h>
 
+enum CONTROLLER_INDEX {VRC_LEFT, VRC_RIGHT};
+
 vr::HmdQuaternion_t GetRotation(vr::HmdMatrix34_t matrix);
 vr::HmdVector3_t GetPosition(vr::HmdMatrix34_t matrix);
 
-struct ControllerButtons
+struct VR_ControllerButtons
 {
-    double trigger;
+    float trigger = 0;
 };
 
-struct ControllerStatus
+// struct ControllerStatus
+// {
+//     bool status = 0;
+// };
+
+struct VR_Pose
 {
-    bool Left = 0;
-    bool Right = 0;
+    geometry_msgs::PoseStamped msg;
 };
 
-class ControllerPoseHandler {
+struct VR_Controller
+{
+    bool status = 0;
+    VR_Pose pose;
+    VR_ControllerButtons buttons;
+};
+
+class VR_ControlHandler {
     public:
-        geometry_msgs::PoseStamped controllerLeft_msg; //Left
-        geometry_msgs::PoseStamped controllerRight_msg; //Right
-        void setMsg(geometry_msgs::PoseStamped, geometry_msgs::PoseStamped);
-        // bool statusControllerLeft = 0;
-        // bool statusControllerRight = 0;
-        ControllerStatus controllerStatus;
-        ControllerButtons controllerLeft_buttons;
-        ControllerButtons controllerRight_buttons;
-        // static geometry_msgs::PoseStamped convertToGeometryMsg(vr::HmdVector3_t controller_position);
-        // static vr::HmdQuaternion_t GetRotation(vr::HmdMatrix34_t matrix);
-
-
+        VR_Controller left;
+        VR_Controller right;
+        VR_Controller *pController[2];
+        VR_ControlHandler(){
+            this->pController[VRC_LEFT] = &this->left;
+            this->pController[VRC_RIGHT] = &this->right;
+        };
+        char name[2][6] = { "Left", "Right"}; 
+        void DebugPrint();
 };
+
 
 #endif //VIVE_POSE_H

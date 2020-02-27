@@ -11,11 +11,24 @@ using namespace vr;
 //You may want to put the global variables in a class, or just leave them here.
 IVRSystem* vr_pointer = NULL;
 
+void VR_ControlHandler::DebugPrint()
+{
+    for(int i = 0; i < 2; i++){
+        printf("\n%-15s%-10s%-10s%-10s%-10s\n", this->name[i], "x", "y", "z", "w");
+        printf("%-15s%-10.4f%-10.4f%-10.4f%-10.4f\n", "Pose", this->pController[i]->pose.msg.pose.position.x, this->pController[i]->pose.msg.pose.position.y, this->pController[i]->pose.msg.pose.position.z, 0.0);
+        printf("%-15s%-10.4f%-10.4f%-10.4f%-10.4f\n", "Orientation", this->pController[i]->pose.msg.pose.orientation.x, this->pController[i]->pose.msg.pose.orientation.y, this->pController[i]->pose.msg.pose.orientation.z, this->pController[i]->pose.msg.pose.orientation.w);
+        printf("%-15s%-10.4f\n", "Trigger", this->pController[i]->buttons.trigger);
+        printf("%-15s%-10i\n", "Status", this->pController[i]->status);
+    }
+}
 
-geometry_msgs::PoseStamped convertToGeometryMsg(HmdVector3_t controller_position, HmdQuaternion_t controller_orientation)
+
+/* This function is very much hardcoded for the panda robot. If use elsewhere add char as input*/
+geometry_msgs::PoseStamped MakeGeometryMsgFromData(HmdVector3_t controller_position, HmdQuaternion_t controller_orientation, const char* frame_id)
 {
     geometry_msgs::PoseStamped controller_msg;
-    controller_msg.header.frame_id = "panda_link0";
+    // controller_msg.header.frame_id = "panda_link0";
+    controller_msg.header.frame_id = frame_id;
     controller_msg.pose.position.x = controller_position.v[0];
     controller_msg.pose.position.z = controller_position.v[1];
     controller_msg.pose.position.y = controller_position.v[2];
@@ -25,17 +38,7 @@ geometry_msgs::PoseStamped convertToGeometryMsg(HmdVector3_t controller_position
     controller_msg.pose.orientation.y = controller_orientation.y;
     controller_msg.pose.orientation.z = controller_orientation.z;
 
-    ROS_INFO("Orientation %f", controller_orientation.w);
-
-    
-
     return controller_msg;
-}
-
-void ControllerPoseHandler::setMsg(geometry_msgs::PoseStamped controllerLeft_msg, geometry_msgs::PoseStamped controllerRight_msg)
-{
-    this->controllerLeft_msg = controllerLeft_msg;
-    this->controllerRight_msg = controllerRight_msg;
 }
 
 
@@ -65,13 +68,11 @@ HmdVector3_t GetPosition(HmdMatrix34_t matrix)
 	return vector;
 }
 
-void GetControllerPositions(ControllerPoseHandler &poseHandler)
+void GetControllerState(VR_ControlHandler &controlHandler)
 {   
-    HmdVector3_t controllerLeft_position;
-    HmdVector3_t controllerRight_position;
 
-    HmdQuaternion_t controllerLeft_orientation;
-    HmdQuaternion_t controllerRight_orientation;
+    // HmdVector3_t controller_position;
+    // HmdQuaternion_t controller_orientation;
 
     for (unsigned int deviceId=0;deviceId<k_unMaxTrackedDeviceCount;deviceId++) {
 
@@ -88,125 +89,30 @@ void GetControllerPositions(ControllerPoseHandler &poseHandler)
             ETrackedControllerRole role = vr_pointer->GetControllerRoleForTrackedDeviceIndex(deviceId);
             vr_pointer->GetControllerState(deviceId, &controllerState, sizeof(controllerState));
             
-            if(role == TrackedControllerRole_LeftHand){
-                poseHandler.controllerStatus.Left = trackedDevicePose.bPoseIsValid;
-                if(trackedDevicePose.bPoseIsValid)
-                    controllerLeft_position = GetPosition(trackedDevicePose.mDeviceToAbsoluteTracking);
-                    controllerLeft_orientation = GetRotation(trackedDevicePose.mDeviceToAbsoluteTracking);
-                    ROS_INFO("Left Trigger: %i", controllerState.rAxis[k_eControllerAxis_Trigger].x);
+            // Decide which of the controllers to update
+            int controllerIndex;
+            role == TrackedControllerRole_LeftHand ? controllerIndex = VRC_LEFT : controllerIndex = VRC_RIGHT;
+            printf("controller index: %i", controllerIndex);
 
-            }else if(role == TrackedControllerRole_RightHand){
-                poseHandler.controllerStatus.Right = trackedDevicePose.bPoseIsValid;
-                if(trackedDevicePose.bPoseIsValid)
-                    controllerRight_position = GetPosition(trackedDevicePose.mDeviceToAbsoluteTracking);
-                    controllerRight_orientation = GetRotation(trackedDevicePose.mDeviceToAbsoluteTracking);
-                    ROS_INFO("Right Trigger: %i", controllerState.rAxis[k_eControllerAxis_Trigger].x);
+            controlHandler.pController[controllerIndex]->buttons.trigger = controllerState.rAxis[1].x;
+            controlHandler.pController[controllerIndex]->status = trackedDevicePose.bPoseIsValid;
 
-                    
+            if(trackedDevicePose.bPoseIsValid)
+            {
+                HmdVector3_t controller_position = GetPosition(trackedDevicePose.mDeviceToAbsoluteTracking);
+                HmdQuaternion_t controller_orientation = GetRotation(trackedDevicePose.mDeviceToAbsoluteTracking);
+                controlHandler.pController[controllerIndex]->pose.msg = MakeGeometryMsgFromData(controller_position, controller_orientation, "panda_link0");
             }
+
             //perform actions with pose struct (see next section)
         }  
     }
 
-    geometry_msgs::PoseStamped controllerLeft_msg = convertToGeometryMsg(controllerLeft_position, controllerLeft_orientation);
-    geometry_msgs::PoseStamped controllerRight_msg = convertToGeometryMsg(controllerRight_position, controllerRight_orientation);
-
-    poseHandler.setMsg(controllerLeft_msg, controllerRight_msg);
 } 
-
-// void SetControllerButtons(ControllerButtons &controllerButtons, VREvent_t event)
-// {
-//     switch( event.data.controller.button ) {
-//         case k_EButton_Grip:
-//             switch(event.eventType)	{
-//                 case VREvent_ButtonPress:			
-//                 break;
-
-//                 case VREvent_ButtonUnpress:			
-//                 break;
-//             }
-//         break;
-
-//         case k_EButton_SteamVR_Trigger:  
-//             switch(event.eventType) {
-//                 case VREvent_ButtonPress:
-//                     // ROS_INFO("BUTTON WAS PRESSED!");	
-//                     controllerButtons.trigger = 1;	
-//                 break;
-
-//                 case VREvent_ButtonUnpress:	
-//                     // ROS_INFO("BUTTON WAS UNPRESSED!");	
-//                     controllerButtons.trigger = 0;		
-//                 break;
-//             }
-//         break;
-
-//         case k_EButton_SteamVR_Touchpad:
-//             switch(event.eventType)	{
-//                 case VREvent_ButtonPress:			
-//                 break;
-
-//                 case VREvent_ButtonUnpress:			
-//                 break;
-
-//                 case VREvent_ButtonTouch:			
-//                 break;
-
-//                 case VREvent_ButtonUntouch:			
-//                 break;
-//             }
-//         break;
-
-//         case k_EButton_ApplicationMenu:  
-//             switch(event.eventType)	{
-//                 case VREvent_ButtonPress: 			
-//                 break;
-
-//                 case VREvent_ButtonUnpress:			
-//                 break;
-//             }
-//         break;
-//     }
-// }
-
-// void GetControllerButtons(ControllerPoseHandler &poseHandler)
-// {
-//     VREvent_t event;
-//     VRControllerState_t controllerState;
-//     if(vr_pointer->PollNextEvent(&event, sizeof(event)))
-//     {
-//         ETrackedDeviceClass trackedDeviceClass = vr_pointer->GetTrackedDeviceClass(event.trackedDeviceIndex);
-//         if(trackedDeviceClass != ETrackedDeviceClass::TrackedDeviceClass_Controller) {
-//             return; //this is a placeholder, but there isn't a controller 
-//             //involved so the rest of the snippet should be skipped
-//         }
-//         ETrackedControllerRole role = 
-//         vr_pointer->GetControllerRoleForTrackedDeviceIndex(event.trackedDeviceIndex);
-//         // controllerState = vr_pointer->GetControllerState(event.trackedDeviceIndex);
-//         if (role == TrackedControllerRole_Invalid){
-//             // The controller is probably not visible to a base station.
-//             //    Invalid role comes up more often than you might think.
-//         }
-//         else if (role == TrackedControllerRole_LeftHand)
-//         {
-//             // Left hand
-//             SetControllerButtons(poseHandler.controller1_buttons, event);
-//         }
-//         else if (role == TrackedControllerRole_RightHand)
-//         {
-//             // Right hand
-//             SetControllerButtons(poseHandler.controller2_buttons, event);
-//         }
-//     }
-// }
-
 
 int main(int argc, char *argv[]) 
 {
-
-    std::cout << "Init variables...\n";
-
-
+    // Init vr stuff
     EVRInitError eError = VRInitError_None;
     vr_pointer = VR_Init(&eError, VRApplication_Background);
     if (eError != VRInitError_None)
@@ -217,38 +123,38 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    ros::init(argc, argv, "pose_publisher");
+    // init ROS
+    ros::init(argc, argv, "vive_publisher");
     ros::NodeHandle n;
 
-    ros::Publisher controller1_pub = n.advertise<geometry_msgs::PoseStamped>("/vive/controller/left/pose", 1);
-    ros::Publisher controller2_pub = n.advertise<geometry_msgs::PoseStamped>("/vive/controller/right/pose", 1);
-    ros::Publisher controller1_pub_button = n.advertise<std_msgs::Float32>("/vive/controller/left/buttons", 1);
-    ros::Publisher controller2_pub_button = n.advertise<std_msgs::Float32>("/vive/controller/right/buttons", 1);
-    ControllerPoseHandler poseHandler;
+    ros::Publisher pub_controllerLeft_pose = n.advertise<geometry_msgs::PoseStamped>("/vive/controller/left/pose", 1);
+    ros::Publisher pub_controllerRight_pose = n.advertise<geometry_msgs::PoseStamped>("/vive/controller/right/pose", 1);
+    ros::Publisher pub_controllerLeft_button = n.advertise<std_msgs::Float32>("/vive/controller/left/trigger", 1);
+    ros::Publisher pub_controllerRight_button = n.advertise<std_msgs::Float32>("/vive/controller/right/trigger", 1);
+
+    VR_ControlHandler controlHandler;
 
 
     ROS_INFO("Started vive_pose node...");
 
-    ros::Rate loop_rate(10);
+    ros::Rate loop_rate(10); // Freq.
+    // Read values position values from controllers & publish values
     while (ros::ok()) {
-        // Read values position values from controllers & publish values
-        GetControllerPositions(poseHandler);
-        // GetControllerButtons(poseHandler);
-
-        ROS_INFO("Controller/left/status: %i", poseHandler.controllerStatus.Left);
-        ROS_INFO("Controller/right/status: %i", poseHandler.controllerStatus.Right);
+        GetControllerState(controlHandler);
+        controlHandler.DebugPrint();
         
-        if(poseHandler.controllerStatus.Left)
-            controller1_pub.publish(poseHandler.controllerLeft_msg);
-            controller1_pub_button.publish(poseHandler.controllerLeft_buttons.trigger);
+        if(controlHandler.left.status)
+            pub_controllerLeft_pose.publish(controlHandler.left.pose.msg);
+            pub_controllerLeft_button.publish(controlHandler.left.buttons.trigger);
 
-        if(poseHandler.controllerStatus.Right)
-            controller2_pub.publish(poseHandler.controllerRight_msg);
+        if(controlHandler.right.status)
+            pub_controllerRight_pose.publish(controlHandler.right.pose.msg);
+            pub_controllerRight_button.publish(controlHandler.left.buttons.trigger);
 
 
         // Update sequence
         ros::spinOnce();
-        loop_rate.sleep(); // Don't forget this! *
+        loop_rate.sleep();
     }
 
     return 0;
