@@ -11,6 +11,7 @@ enum CONTROLLER_INDEX {VRC_LEFT, VRC_RIGHT};
 
 vr::HmdQuaternion_t GetRotation(vr::HmdMatrix34_t matrix);
 vr::HmdVector3_t GetPosition(vr::HmdMatrix34_t matrix);
+geometry_msgs::Pose Remap(geometry_msgs::Pose pose);
 
 struct VR_ControllerButtons
 {
@@ -25,6 +26,7 @@ struct VR_ControllerButtons
 struct VR_Pose
 {
     geometry_msgs::PoseStamped msg;
+    geometry_msgs::Pose basePose;
 };
 
 struct VR_Controller
@@ -32,6 +34,9 @@ struct VR_Controller
     bool status = 0;
     VR_Pose pose;
     VR_ControllerButtons buttons;
+    void SetBasePose(geometry_msgs::Pose pose){
+        this->pose.basePose = pose;
+    };
 };
 
 class VR_ControlHandler {

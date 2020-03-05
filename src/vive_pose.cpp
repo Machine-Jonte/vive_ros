@@ -6,10 +6,27 @@
 #include <std_msgs/Float32.h>
 #include <openvr.h>
 #include <unistd.h>
+#include <tf2_ros/transform_broadcaster.h>
+
+
 using namespace vr;
 
 //You may want to put the global variables in a class, or just leave them here.
 IVRSystem* vr_pointer = NULL;
+
+
+geometry_msgs::Pose Remap(geometry_msgs::Pose pose)
+{
+    double x = pose.position.x;
+    double y = pose.position.y;
+    double z = pose.position.z;
+
+    pose.position.x = -z;
+    pose.position.y = -x;
+    pose.position.z = y;
+
+    return pose;
+}
 
 void VR_ControlHandler::DebugPrint()
 {
@@ -30,12 +47,19 @@ geometry_msgs::PoseStamped MakeGeometryMsgFromData(HmdVector3_t controller_posit
     // controller_msg.header.frame_id = "panda_link0";
     controller_msg.header.frame_id = frame_id;
     controller_msg.pose.position.x = controller_position.v[0];
-    controller_msg.pose.position.z = controller_position.v[1];
-    controller_msg.pose.position.y = controller_position.v[2];
+    controller_msg.pose.position.y = controller_position.v[1];
+    controller_msg.pose.position.z = controller_position.v[2];
+
+    controller_msg.pose = Remap(controller_msg.pose);
+
+    // controller_msg.pose.orientation.w = controller_orientation.w; //roll
+    // controller_msg.pose.orientation.x = -controller_orientation.z;
+    // controller_msg.pose.orientation.y = -controller_orientation.x;
+    // controller_msg.pose.orientation.z = controller_orientation.y; 
 
     controller_msg.pose.orientation.w = controller_orientation.w; //roll
     controller_msg.pose.orientation.x = controller_orientation.x;
-    controller_msg.pose.orientation.y = controller_orientation.y;
+    controller_msg.pose.orientation.y = -controller_orientation.y;
     controller_msg.pose.orientation.z = controller_orientation.z;
 
     return controller_msg;
@@ -92,7 +116,6 @@ void GetControllerState(VR_ControlHandler &controlHandler)
             // Decide which of the controllers to update
             int controllerIndex;
             role == TrackedControllerRole_LeftHand ? controllerIndex = VRC_LEFT : controllerIndex = VRC_RIGHT;
-            printf("controller index: %i", controllerIndex);
 
             controlHandler.pController[controllerIndex]->buttons.trigger = controllerState.rAxis[1].x;
             controlHandler.pController[controllerIndex]->status = trackedDevicePose.bPoseIsValid;
@@ -127,12 +150,16 @@ int main(int argc, char *argv[])
     ros::init(argc, argv, "vive_publisher");
     ros::NodeHandle n;
 
-    ros::Publisher pub_controllerLeft_pose = n.advertise<geometry_msgs::PoseStamped>("/vive/controller/left/pose", 1);
-    ros::Publisher pub_controllerRight_pose = n.advertise<geometry_msgs::PoseStamped>("/vive/controller/right/pose", 1);
-    ros::Publisher pub_controllerLeft_button = n.advertise<std_msgs::Float32>("/vive/controller/left/trigger", 1);
-    ros::Publisher pub_controllerRight_button = n.advertise<std_msgs::Float32>("/vive/controller/right/trigger", 1);
+
+    ros::Publisher pub_controller_pose[] = {n.advertise<geometry_msgs::PoseStamped>("/vive/controller/left/pose", 1), n.advertise<geometry_msgs::PoseStamped>("/vive/controller/right/pose", 1)};
+    ros::Publisher pub_controller_trigger[] = {n.advertise<std_msgs::Float32>("/vive/controller/left/trigger", 1), n.advertise<std_msgs::Float32>("/vive/controller/right/trigger", 1)};
+
+    // ros::Publisher pub_controllerRight_pose = n.advertise<geometry_msgs::PoseStamped>("/vive/controller/right/pose", 1);
+    // ros::Publisher pub_controllerLeft_button = n.advertise<std_msgs::Float32>("/vive/controller/left/trigger", 1);
+    // ros::Publisher pub_controllerRight_button = n.advertise<std_msgs::Float32>("/vive/controller/right/trigger", 1);
 
     VR_ControlHandler controlHandler;
+    
 
 
     ROS_INFO("Started vive_pose node...");
@@ -142,15 +169,15 @@ int main(int argc, char *argv[])
     while (ros::ok()) {
         GetControllerState(controlHandler);
         controlHandler.DebugPrint();
-        
-        if(controlHandler.left.status)
-            pub_controllerLeft_pose.publish(controlHandler.left.pose.msg);
-            pub_controllerLeft_button.publish(controlHandler.left.buttons.trigger);
 
-        if(controlHandler.right.status)
-            pub_controllerRight_pose.publish(controlHandler.right.pose.msg);
-            pub_controllerRight_button.publish(controlHandler.left.buttons.trigger);
-
+        for(int i = 0; i < 2; i++)
+        {
+            if(controlHandler.pController[i]->status)
+            {
+                pub_controller_pose[i].publish(controlHandler.pController[i]->pose.msg);
+                pub_controller_trigger[i].publish(controlHandler.pController[i]->buttons.trigger);
+            }
+        }
 
         // Update sequence
         ros::spinOnce();
