@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node name="vive_pose" pkg="vive_ros" type="vive_pose"/>
+  <node name="controller_tf2_broadcaster" pkg="vive_ros" type="controller_tf2_broadcaster"/>
+
+</launch>
