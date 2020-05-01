@@ -1,9 +1,13 @@
+// Written by Jonathan Österberg. This is the file that is added to the vive_ros package.
+// If questions, contact me on jonte_ost@live.com
+
 #include <iostream>
 #include "vive_pose.h"
 #include "ros/ros.h"
 #include <geometry_msgs/PoseStamped.h>
 #include <visualization_msgs/Marker.h>
 #include <std_msgs/Float32.h>
+#include <std_msgs/Float32MultiArray.h>
 #include <std_msgs/Int32.h>
 #include <openvr.h>
 #include <unistd.h>
@@ -123,6 +127,8 @@ void GetControllerState(VR_ControlHandler &controlHandler)
 
 
             controlHandler.pController[controllerIndex]->buttons.trigger = controllerState.rAxis[1].x; // 1 is trigger
+            controlHandler.pController[controllerIndex]->buttons.touchpad[0] = controllerState.rAxis[0].x; // touchpad x axis
+            controlHandler.pController[controllerIndex]->buttons.touchpad[1] = controllerState.rAxis[0].y; // touchpad y axis
             // printf("1: %f, 2: %f, 3: %f, 4: %f, 5: %f\n", controllerState.rAxis[0].y, controllerState.rAxis[1].y, controllerState.rAxis[2].y, controllerState.rAxis[3].y, controllerState.rAxis[4].y);
             // printf("BitFlag: %u", controllerState.ulButtonPressed);
             std::bitset<8> digitalButtons(controllerState.ulButtonPressed);
@@ -168,6 +174,7 @@ int main(int argc, char *argv[])
     ros::Publisher pub_controller_trigger[] = {n.advertise<std_msgs::Float32>("/vive/controller/left/trigger", 1), n.advertise<std_msgs::Float32>("/vive/controller/right/trigger", 1)};
     ros::Publisher pub_controller_menu[] = {n.advertise<std_msgs::Int32>("/vive/controller/left/buttons/menu", 1), n.advertise<std_msgs::Int32>("/vive/controller/right/buttons/menu", 1)};
     ros::Publisher pub_controller_grip[] = {n.advertise<std_msgs::Int32>("/vive/controller/left/buttons/grip", 1), n.advertise<std_msgs::Int32>("/vive/controller/right/buttons/grip", 1)};
+    ros::Publisher pub_controller_touchpad[] = {n.advertise<std_msgs::Float32MultiArray>("/vive/controller/left/touchpad", 1), n.advertise<std_msgs::Float32MultiArray>("/vive/controller/right/touchpad", 1)};
 
     // ros::Publisher pub_controllerRight_pose = n.advertise<geometry_msgs::PoseStamped>("/vive/controller/right/pose", 1);
     // ros::Publisher pub_controllerLeft_button = n.advertise<std_msgs::Float32>("/vive/controller/left/trigger", 1);
@@ -189,10 +196,17 @@ int main(int argc, char *argv[])
         {
             if(controlHandler.pController[i]->status)
             {
+                std_msgs::Float32MultiArray touchpad_msg;
+                touchpad_msg.data = controlHandler.pController[i]->buttons.touchpad;
+                // touchpad_msg.layout.dim[0].size = controlHandler.pController[i]->buttons.touchpad.size();
+                // touchpad_msg.layout.dim[0].stride = 1;
+                // touchpad_msg.layout.dim[0].label = "x";
+                
                 pub_controller_pose[i].publish(controlHandler.pController[i]->pose.msg);
                 pub_controller_trigger[i].publish(controlHandler.pController[i]->buttons.trigger);
                 pub_controller_menu[i].publish(controlHandler.pController[i]->buttons.menu);
                 pub_controller_grip[i].publish(controlHandler.pController[i]->buttons.grip);
+                pub_controller_touchpad[i].publish(touchpad_msg);
             }
         }
 

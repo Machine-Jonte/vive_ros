@@ -5,6 +5,7 @@
 #include <geometry_msgs/PoseStamped.h>
 // #include <visualization_msgs/Marker.h>
 #include <openvr.h>
+#include <vector>
 // #include <unistd.h>
 
 enum CONTROLLER_INDEX {VRC_LEFT, VRC_RIGHT};
@@ -18,6 +19,7 @@ struct VR_ControllerButtons
     float trigger = 0;
     int menu = 0;
     int grip = 0;
+    std::vector<float> touchpad = {0,0};
 };
 
 // struct ControllerStatus
