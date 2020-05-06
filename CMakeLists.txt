@@ -104,12 +104,6 @@ add_executable(vive_pose
   src/vive_pose.cpp
 )
 
-add_executable(controller_tf2_broadcaster
-  ${SHARED_SRC_FILES}
-  # ${catkin_LIBRARIES}
-  src/controller_tf2_broadcaster.cpp
-)
-
 ## link all
 target_link_libraries(vive_node
   ${catkin_LIBRARIES}
@@ -134,14 +128,5 @@ target_link_libraries(vive_pose
   ${EXTRA_LIBS}
 )
 
-target_link_libraries(controller_tf2_broadcaster
-  ${catkin_LIBRARIES}
-  ${OPENGL_LIBRARIES} ## (OpenGL specific)
-  ${GLEW_LIBRARIES} ## (OpenGL specific)
-  ${VULKAN_LIBRARY} ## (Vulkan specific)
-  ${SDL2_LIBRARIES}
-  ${OPENVR_LIBRARIES}
-  ${CMAKE_DL_LIBS}
-  ${EXTRA_LIBS}
-)
+
 
