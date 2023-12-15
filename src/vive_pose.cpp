@@ -203,9 +203,17 @@ int main(int argc, char *argv[])
                 // touchpad_msg.layout.dim[0].label = "x";
                 
                 pub_controller_pose[i].publish(controlHandler.pController[i]->pose.msg);
-                pub_controller_trigger[i].publish(controlHandler.pController[i]->buttons.trigger);
-                pub_controller_menu[i].publish(controlHandler.pController[i]->buttons.menu);
-                pub_controller_grip[i].publish(controlHandler.pController[i]->buttons.grip);
+                std_msgs::Float32 trigger_msg;
+                trigger_msg.data = controlHandler.pController[i]->buttons.trigger;
+                pub_controller_trigger[i].publish(trigger_msg);
+
+                std_msgs::Int32 menu_msg;
+                menu_msg.data = controlHandler.pController[i]->buttons.menu;
+                pub_controller_menu[i].publish(menu_msg);
+
+                std_msgs::Int32 grip_msg;
+                grip_msg.data = controlHandler.pController[i]->buttons.grip;
+                pub_controller_grip[i].publish(grip_msg);
                 pub_controller_touchpad[i].publish(touchpad_msg);
             }
         }
